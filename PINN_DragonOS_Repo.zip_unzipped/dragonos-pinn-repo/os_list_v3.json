@@ -1,1 +1,41 @@
-🧾 Hier steht deine OS-Auswahl drin
+[
+  {
+    "name": "dragonos-pi64",
+    "description": "DragonOS Pi64 \u2013 SDR\u2011Distro mit GQRX, SigDigger & Co.",
+    "url": "https://loebi84.github.io/Pinn-Dragonos/dragonos/",
+    "group": "Raspbian",
+    "subgroup": "Dragon",
+    "icon": "https://loebi84.github.io/Pinn-Dragonos/dragonos/icon.png",
+    "marketing_info": "DragonOS ist SDR\u2011ready \u2013 SSH & VNC ab Werk aktiv! Zugang: dragon/dragon.",
+    "imagefolder": "dragonos",
+    "supports_backup": true
+  },
+  {
+    "name": "raspios-lite",
+    "description": "Raspberry Pi OS Lite (32\u2011bit)",
+    "url": "http://downloads.raspberrypi.org/raspios_lite_armhf_latest",
+    "group": "Raspbian",
+    "subgroup": "Lite"
+  },
+  {
+    "name": "raspios-full",
+    "description": "Raspberry Pi OS Full (32\u2011bit)",
+    "url": "http://downloads.raspberrypi.org/raspios_full_armhf_latest",
+    "group": "Raspbian",
+    "subgroup": "Full"
+  },
+  {
+    "name": "libreelec-rpi4",
+    "description": "LibreELEC for Raspberry Pi 4",
+    "url": "http://releases.libreelec.tv/LibreELEC-RPi4.arm-9.2.6.img.gz",
+    "group": "Media",
+    "subgroup": "LibreELEC"
+  },
+  {
+    "name": "retropie",
+    "description": "RetroPie Gaming System",
+    "url": "https://downloads.petrockblock.com/images/retropie/",
+    "group": "Games",
+    "subgroup": "Emulation"
+  }
+]
