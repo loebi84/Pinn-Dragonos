@@ -1,0 +1,32 @@
+{
+  "name": "DragonOS Pi64",
+  "description": "DragonOS für PINN – SDR & Pentest Distribution\nSSH: aktiviert | VNC: aktiviert",
+  "url": "https://sourceforge.net/projects/dragonos/",
+  "version": "Beta 2025",
+  "release_date": "2025-06-08",
+  "supported_hex": "0x4",
+  "username": "pi",
+  "password": "dragonos",
+  "feature_level": 2,
+  "supported_models": ["pi4", "pi400", "cm4"],
+  "partition_setup": "dragonos/partition_setup.sh",
+  "partitions": [
+    {
+      "label": "dragon_boot",
+      "filesystem_type": "FAT",
+      "tarball": "dragonos/boot.tar.xz",
+      "mkfs_options": "-F 32"
+    },
+    {
+      "label": "dragon_root",
+      "filesystem_type": "ext4",
+      "tarball": "dragonos/root.tar.xz"
+    }
+  ],
+  "icon": "dragonos/icon.png",
+  "slides_vga": [
+    "dragonos/slides_vga.png"
+  ],
+  "bootable": true,
+  "requires_reboot": true
+}
