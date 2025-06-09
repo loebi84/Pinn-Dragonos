@@ -1,4 +1,4 @@
-b#!/bin/sh
+#!/bin/sh
 # DragonOS Partition Setup für PINN
 
 # Label Boot-Partition
