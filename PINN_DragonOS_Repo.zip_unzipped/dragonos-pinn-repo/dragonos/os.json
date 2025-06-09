@@ -28,5 +28,8 @@
     "dragonos/slides_vga.png"
   ],
   "bootable": true,
-  "requires_reboot": true
+
+  "postinstall_script": "dragonos/postinstall.sh",
+  "requires_reboot":" true"
+
 }
