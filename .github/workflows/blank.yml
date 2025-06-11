@@ -1,19 +1,47 @@
-- name: 🧠 DragonOS-Link dynamisch holen
-  id: get-dragonos
-  run: |
-    echo "📡 RSS-Feed wird analysiert…"
-    feed_url="https://sourceforge.net/projects/dragonos/rss?path=/DragonOS_Pi64"
-    latest_url=$(curl -s "$feed_url" | grep -oP 'url="\Khttps://.*?\.img\.xz(?=")' | head -n 1)
+name: Update DragonOS weekly
 
-    if [ -z "$latest_url" ]; then
-      echo "❌ Kein Download-Link gefunden!"
-      exit 1
-    fi
+on:
+  schedule:
+    - cron: '0 3 * * 1'  # Jeden Montag um 03:00 UTC
+  workflow_dispatch:
 
-    echo "✅ Gefundener Link: $latest_url"
-    echo "dragonos_url=$latest_url" >> $GITHUB_OUTPUT
+jobs:
+  update-dragonos:
+    runs-on: ubuntu-latest
 
-- name: 📥 DragonOS herunterladen
-  run: |
-    echo "📦 Lade DragonOS von: ${{ steps.get-dragonos.outputs.dragonos_url }}"
-    wget -O dragonos.img.xz "${{ steps.get-dragonos.outputs.dragonos_url }}"
+    steps:
+      - name: 📥 Repo klonen
+        uses: actions/checkout@v3
+
+      - name: 🧠 DragonOS-Link dynamisch holen
+        id: get-dragonos
+        run: |
+          echo "📡 RSS-Feed wird analysiert…"
+          feed_url="https://sourceforge.net/projects/dragonos/rss?path=/DragonOS_Pi64"
+          latest_url=$(curl -s "$feed_url" | grep -oP 'url="\\Khttps://.*?\\.img\\.xz(?=")' | head -n 1)
+
+          if [ -z "$latest_url" ]; then
+            echo "❌ Kein Download-Link gefunden!"
+            exit 1
+          fi
+
+          echo "✅ Gefundener Link: $latest_url"
+          echo "dragonos_url=$latest_url" >> $GITHUB_OUTPUT
+
+      - name: 📥 DragonOS herunterladen
+        run: |
+          echo "📦 Lade DragonOS von: ${{ steps.get-dragonos.outputs.dragonos_url }}"
+          wget -O dragonos.img.xz "${{ steps.get-dragonos.outputs.dragonos_url }}"
+
+      - name: 🔧 Split & Convert .img → .tar.xz
+        run: |
+          chmod +x split_and_convert.sh
+          ./split_and_convert.sh
+
+      - name: ⬆️ Push ins Repo
+        run: |
+          git config user.name "LöbiBot"
+          git config user.email "bot@dragonos.local"
+          git add boot.tar.xz root.tar.xz
+          git commit -m "🐉 Weekly DragonOS update ($(date +'%Y-%m-%d'))"
+          git push
