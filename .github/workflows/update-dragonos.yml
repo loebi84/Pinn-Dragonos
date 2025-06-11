@@ -11,23 +11,23 @@ jobs:
 
     steps:
       - name: 📥 Repo klonen
-        uses: actions/checkout@v3
+        uses: actions/checkout@
 
       - name: 🧠 DragonOS-Link dynamisch holen
-        id: get-dragonos
-        run: |
-          echo "📡 RSS-Feed wird analysiert…"
-          feed_url="https://sourceforge.net/projects/dragonos/rss?path=/DragonOS_Pi64"
-          latest_url=$(curl -s "$feed_url" | grep -oP 'url="\\Khttps://.*?\\.img\\.xz(?=")' | head -n 1)
+  id: get-dragonos
+  run: |
+    echo "📡 Hole Link aus HTML-Seite…"
+    latest_url=$(curl -s "https://sourceforge.net/projects/dragonos/files/DragonOS_Pi64/" | \
+      grep -oP 'https://downloads.sourceforge.net/project/dragonos/.*?\.img\.xz' | head -n 1)
 
-          if [ -z "$latest_url" ]; then
-            echo "❌ Kein Download-Link gefunden!"
-            exit 1
-          fi
+    if [ -z "$latest_url" ]; then
+      echo "❌ Kein Download-Link gefunden!"
+      exit 1
+    fi
 
-          echo "✅ Gefundener Link: $latest_url"
-          echo "dragonos_url=$latest_url" >> $GITHUB_OUTPUT
-
+    echo "✅ Gefundener Link: $latest_url"
+    echo "dragonos_url=$latest_url" >> $GITHUB_OUTPUT
+      
       - name: 📥 DragonOS herunterladen
         run: |
           echo "📦 Lade DragonOS von: ${{ steps.get-dragonos.outputs.dragonos_url }}"
