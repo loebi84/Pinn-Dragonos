@@ -13,27 +13,13 @@ jobs:
       - name: 📥 Repo klonen
         uses: actions/checkout@
 
-      - name: 🧠 DragonOS-Link dynamisch holen
-  id: get-dragonos
+    
+     - name: 📥 DragonOS herunterladen (SourceForge Redirect)
   run: |
-    echo "📡 Hole Link aus HTML-Seite…"
-    latest_url=$(curl -s "https://sourceforge.net/projects/dragonos/files/DragonOS_Pi64/" | \
-      grep -oP 'https://downloads.sourceforge.net/project/dragonos/.*?\.img\.xz' | head -n 1)
-
-    if [ -z "$latest_url" ]; then
-      echo "❌ Kein Download-Link gefunden!"
-      exit 1
-    fi
-
-    echo "✅ Gefundener Link: $latest_url"
-    echo "dragonos_url=$latest_url" >> $GITHUB_OUTPUT
-      
-      - name: 📥 DragonOS herunterladen
-        run: |
-          echo "📦 Lade DragonOS von: ${{ steps.get-dragonos.outputs.dragonos_url }}"
-          wget -O dragonos.img.xz "${{ steps.get-dragonos.outputs.dragonos_url }}"
-
-      - name: 🔧 Split & Convert .img → .tar.xz
+    echo "📦 Lade DragonOS über Weiterleitung…"
+    wget --content-disposition -O dragonos.img.xz "https://sourceforge.net/projects/dragonos-pi64/files/latest/download"
+     
+ - name: 🔧 Split & Convert .img → .tar.xz
         run: |
           chmod +x split_and_convert.sh
           ./split_and_convert.sh
