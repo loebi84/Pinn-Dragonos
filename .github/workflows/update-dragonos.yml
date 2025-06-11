@@ -17,7 +17,7 @@ jobs:
      - name: 📥 DragonOS herunterladen (SourceForge Redirect)
   run: |
     echo "📦 Lade DragonOS über Weiterleitung…"
-    wget --content-disposition -O DragonOS_Pi64_Beta39.2.img.gz "https://sourceforge.net/projects/dragonos-pi64/files/latest/download"
+    wget -O DragonOS_Pi64_Beta39.2.img.gz "https://sourceforge.net/projects/dragonos-pi64/files/latest/download/DragonOS_Pi64_Beta39.2.img.gz"
      
  - name: 🔧 Split & Convert .img → .tar.xz
         run: |
