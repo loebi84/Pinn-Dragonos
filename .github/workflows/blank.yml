@@ -1,40 +1,15 @@
-# name: Update DragonOS weekly
+- name: 🔍 Hole aktuellen DragonOS-Link dynamisch
+  id: get-dragonos-url
+  run: |
+    echo "🧠 Lade RSS-Feed von SourceForge…"
+    curl -s "https://sourceforge.net/projects/dragonos/rss?path=/DragonOS_Pi64" > feed.xml
 
-on:
-  schedule:
-    - cron: '0 3 * * 1' # Jeden Montag um 03:00 Uhr UTC
-  workflow_dispatch: # Manuell auslösbar
+    echo "🔎 Suche nach .img.xz-Datei…"
+    download_url=$(grep -oP 'url="\K[^"]+\.img\.xz' feed.xml | head -n 1)
 
-jobs:
-  update-dragonos:
-    runs-on: ubuntu-latest
+    echo "📎 Gefundene URL: $download_url"
+    echo "dragonos_url=$download_url" >> $GITHUB_OUTPUT
 
-    steps:
-    - name: 📥 Repo clonen
-      uses: actions/checkout@v3
-
-    - name: 🐉 DragonOS Beta herunterladen
-      run: |
-        wget -O dragonos.img.xz "https://sourceforge.net/projects/dragonos/files/DragonOS_Pi64/latest/download"
-    
-    - name: 📦 Image extrahieren
-      run: |
-        mkdir -p mount
-        xz -d dragonos.img.xz
-        # Falls gewünscht: mount, boot/root trennen und zu .tar.xz packen
-
-    - name: 🛠️ In boot/root umwandeln (Demo-Zweck)
-      run: |
-        mkdir -p dragonos/boot dragonos/root
-        echo "Boot-Inhalt hier" > dragonos/boot/README.txt
-        echo "Root-Inhalt hier" > dragonos/root/README.txt
-        tar -cJf dragonos/boot.tar.xz -C dragonos/boot .
-        tar -cJf dragonos/root.tar.xz -C dragonos/root .
-
-    - name: ⬆️ Push ins Repo
-      run: |
-        git config user.name "LöbiBot"
-        git config user.email "bot@dragonos.local"
-        git add dragonos/boot.tar.xz dragonos/root.tar.xz
-        git commit -m "🛠️ Weekly update DragonOS: $(date +%F)"
-        git push
+- name: 📥 Lade DragonOS.img.xz
+  run: |
+    wget -O dragonos.img.xz "${{ steps.get-dragonos-url.outputs.dragonos_url }}"
