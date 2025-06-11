@@ -19,7 +19,7 @@ jobs:
     wget --content-disposition -O dragonos.img.xz "https://sourceforge.net/projects/dragonos-pi64/files/latest/download"
 
       - name: 🔧 Split & Convert .img → .tar.xz
-        run: |
+      run: |
           chmod +x split_and_convert.sh
           ./split_and_convert.sh
 
