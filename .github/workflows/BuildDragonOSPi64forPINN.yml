@@ -1,3 +1,28 @@
+
+name: 🐉 Build DragonOS Pi64 for PINN
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 3 * * 1"
+
+permissions:
+  contents: write
+
+env:
+  DRAGONOS_URL: "https://sourceforge.net/projects/dragonos-pi64/files/DragonOS_Pi64_Beta42.img.gz/download"
+  IMAGE_GZ: "DragonOS_Pi64_Beta42.img.gz"
+  IMAGE: "DragonOS_Pi64_Beta42.img"
+
+jobs:
+  build-pinn:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Repository klonen
+        uses: actions/checkout@v4
+
+
       # ----------------------------------------------------------
       # 6. Partitionen robust erkennen und Tarballs erzeugen
       # ----------------------------------------------------------
