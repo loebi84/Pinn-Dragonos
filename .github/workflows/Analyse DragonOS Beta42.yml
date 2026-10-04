@@ -1,0 +1,40 @@
+name: Analyse DragonOS Beta42
+
+on:
+  workflow_dispatch:
+
+jobs:
+  analyse:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Repo klonen
+        uses: actions/checkout@v4
+
+      - name: 📥 DragonOS Beta42 laden
+        run: |
+          wget -O DragonOS_Pi64_Beta42.img.gz \
+            "https://sourceforge.net/projects/dragonos-pi64/files/DragonOS_Pi64_Beta42.img.gz/download"
+
+      - name: 📦 Image entpacken
+        run: |
+          gzip -dc DragonOS_Pi64_Beta42.img.gz > DragonOS_Pi64_Beta42.img
+
+      - name: 🔍 Partitionstabelle anzeigen
+        run: |
+          echo "===== fdisk ====="
+          sudo fdisk -l DragonOS_Pi64_Beta42.img
+
+          echo
+          echo "===== parted ====="
+          sudo parted DragonOS_Pi64_Beta42.img unit s print
+
+      - name: 📊 Dateisysteme erkennen
+        run: |
+          echo "===== blkid ====="
+          sudo blkid DragonOS_Pi64_Beta42.img || true
+
+      - name: 💾 Speicherplatz
+        run: |
+          df -h
+          ls -lh DragonOS_Pi64_Beta42.img*
