@@ -289,12 +289,12 @@ jobs:
           echo "Partition 2:"
           echo "$PART2"
 
-          # ========================================================
+                    # ========================================================
           # Partitionen auslesen
           # ========================================================
 
-          PART1_FS="$(echo "$PART1" | cut -d: -f6)"
-          PART2_FS="$(echo "$PART2" | cut -d: -f6)"
+          PART1_FS="$(echo "$PART1" | cut -d: -f5)"
+          PART2_FS="$(echo "$PART2" | cut -d: -f5)"
 
           PART1_START="$(
             echo "$PART1" |
@@ -320,6 +320,11 @@ jobs:
             sed 's/s$//'
           )"
 
+          echo
+          echo "Erkannte Dateisysteme:"
+          echo "  Partition 1: $PART1_FS"
+          echo "  Partition 2: $PART2_FS"
+
           # ========================================================
           # Partitionstypen prüfen
           # ========================================================
@@ -344,6 +349,10 @@ jobs:
             echo "Gefunden: $PART2_FS"
             exit 1
           fi
+
+          echo
+          echo "✅ Partition 1: FAT erkannt"
+          echo "✅ Partition 2: Linux-Dateisystem erkannt"
 
           # ========================================================
           # Größen berechnen
