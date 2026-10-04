@@ -407,37 +407,20 @@ jobs:
           # Größen berechnen
           # ------------------------------------------------------
 
-          BOOT_SECTORS=$(
-            (BOOT_END - BOOT_START + 1)
-          )
+          BOOT_SECTORS=$((BOOT_END - BOOT_START + 1))
+          ROOT_SECTORS=$((ROOT_END - ROOT_START + 1))
 
-          ROOT_SECTORS=$(
-            (ROOT_END - ROOT_START + 1)
-          )
+          BOOT_PARTITION_BYTES=$((BOOT_SECTORS * SECTOR_SIZE))
+          ROOT_PARTITION_BYTES=$((ROOT_SECTORS * SECTOR_SIZE))
 
-          BOOT_PARTITION_BYTES=$(
-            (BOOT_SECTORS * SECTOR_SIZE)
-          )
+          BOOT_PARTITION_MIB=$((BOOT_PARTITION_BYTES / 1024 / 1024))
+          ROOT_PARTITION_MIB=$((ROOT_PARTITION_BYTES / 1024 / 1024))
 
-          ROOT_PARTITION_BYTES=$(
-            (ROOT_SECTORS * SECTOR_SIZE)
-          )
+         BOOT_OFFSET=$((BOOT_START * SECTOR_SIZE))
+         ROOT_OFFSET=$((ROOT_START * SECTOR_SIZE))
 
-          BOOT_PARTITION_MIB=$(
-            (BOOT_PARTITION_BYTES / 1024 / 1024)
-          )
 
-          ROOT_PARTITION_MIB=$(
-            (ROOT_PARTITION_BYTES / 1024 / 1024)
-          )
-
-          BOOT_OFFSET=$(
-            (BOOT_START * SECTOR_SIZE)
-          )
-
-          ROOT_OFFSET=$(
-            (ROOT_START * SECTOR_SIZE)
-          )
+          
 
           echo
           echo "=============================="
