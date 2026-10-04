@@ -343,19 +343,3 @@ gitcommit-m"🐉UpdatePINNmetadataforDragonOSBeta42"
 gitpush
 fi
 
-###⚠️EineSachemusstduvordemerstenLaufändern
-
-ImletztenTeilstehenmomentan:
-
-https://loebi84.github.io/Pinn-Dragonos/dragonos/boot.tar.xz
-https://loebi84.github.io/Pinn-Dragonos/dragonos/root.tar.xz
-
-DieseURLsfunktionierennochnicht,weilwirdiemehrereGBgroßenDateiennichtpergitpushinGitHubPagesbekommen.
-
-Dasistaberabsichtlichso:DieActionerzeugtdieechtenDateienundlegtsiezunächstalsArtifactab.DanachkönnenwirsieaufSourceForgehochladenundnurdiesebeidenURLsinos_list_v3.json/partitions.jsoneinsetzen.
-
-AußerdemhabeichdiePINN-StrukturgegenüberdeinerbisherigenDateikorrigiert:os_list_v3.jsonenthälteinos_list-Array,unddieeigentlichenPartitionsparametergehöreninpartitions.json.
-
-**NocheinwichtigerPunkt:**Deinebisherigepostinstall.sh,partition_setup.shundicon.pngbleibendabeiunangetastet.
-
-WenndudieseActionlaufenlässt,istdernächsteinteressanteOutputdieGrößevonboot.tar.xzundroot.tar.xz.DamitkönnenwiranschließenddenSourceForge-Uploadautomatisieren.
