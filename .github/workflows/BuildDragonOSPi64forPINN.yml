@@ -11,7 +11,6 @@ permissions:
 env:
   DRAGONOS_VERSION: "Beta42"
   DRAGONOS_URL: "https://sourceforge.net/projects/dragonos-pi64/files/DragonOS_Pi64_Beta42.img.gz/download"
-  DRAGONOS_SHA256: "752d99c29d060378dcad058b59cd434f492384c3b986e71d095740f9b0e35c31"
 
   IMAGE_GZ: "DragonOS_Pi64_Beta42.img.gz"
   IMAGE: "DragonOS_Pi64_Beta42.img"
@@ -24,48 +23,46 @@ jobs:
 
     steps:
 
-      # ------------------------------------------------------------
+      # ============================================================
       # Repository
-      # ------------------------------------------------------------
+      # ============================================================
 
       - name: 📥 Repository klonen
         uses: actions/checkout@v4
 
-      # ------------------------------------------------------------
+      # ============================================================
       # Werkzeuge
-      # ------------------------------------------------------------
+      # ============================================================
 
-      - name: 🔧 Benötigte Werkzeuge installieren
+      - name: 🔧 Werkzeuge installieren
         shell: bash
         run: |
           set -euo pipefail
 
           sudo apt-get update
+
           sudo apt-get install -y \
+            curl \
             parted \
             xz-utils \
             gzip \
             jq \
             util-linux
 
-      # ------------------------------------------------------------
+      # ============================================================
       # DragonOS Image Cache
-      #
-      # Wir cachen bewusst die .img.gz und NICHT die entpackte .img.
-      # Dadurch wird die 5-GB-Datei nach dem ersten Lauf nicht erneut
-      # aus dem Internet geladen.
-      # ------------------------------------------------------------
+      # ============================================================
 
       - name: 💾 DragonOS Image Cache
         id: dragonos-cache
         uses: actions/cache@v4
         with:
           path: ${{ env.IMAGE_GZ }}
-          key: dragonos-${{ env.DRAGONOS_VERSION }}-${{ env.DRAGONOS_SHA256 }}
+          key: dragonos-pi64-${{ env.DRAGONOS_VERSION }}-img-gz-v1
 
-      # ------------------------------------------------------------
-      # Image herunterladen, falls nicht im Cache
-      # ------------------------------------------------------------
+      # ============================================================
+      # DragonOS herunterladen
+      # ============================================================
 
       - name: 📥 DragonOS Pi64 herunterladen
         if: steps.dragonos-cache.outputs.cache-hit != 'true'
@@ -81,38 +78,96 @@ jobs:
             --location \
             --retry 5 \
             --retry-delay 10 \
+            --connect-timeout 30 \
             --output "$IMAGE_GZ" \
             "$DRAGONOS_URL"
 
-      # ------------------------------------------------------------
-      # SHA256 prüfen
-      # ------------------------------------------------------------
+          echo
+          echo "Download abgeschlossen:"
+          ls -lh "$IMAGE_GZ"
 
-      - name: 🔐 SHA256 des DragonOS Images prüfen
+      # ============================================================
+      # Offizielle SHA256 von SourceForge laden
+      # ============================================================
+
+      - name: 🔐 Offizielle SHA256-Prüfsumme laden
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          SHA256_URL="https://sourceforge.net/projects/dragonos-pi64/files/DragonOS_Pi64_Beta42.img.gz.SHA256.txt/download"
+
+          curl \
+            --fail \
+            --location \
+            --retry 5 \
+            --retry-delay 10 \
+            --connect-timeout 30 \
+            --output DragonOS_Pi64_Beta42.img.gz.SHA256.txt \
+            "$SHA256_URL"
+
+          echo
+          echo "===== Offizielle SHA256-Datei ====="
+          cat DragonOS_Pi64_Beta42.img.gz.SHA256.txt
+
+          EXPECTED_SHA256="$(
+            awk '
+              NF >= 1 &&
+              $1 ~ /^[0-9a-fA-F]{64}$/ {
+                print tolower($1)
+                exit
+              }
+            ' DragonOS_Pi64_Beta42.img.gz.SHA256.txt
+          )"
+
+          if [[ -z "$EXPECTED_SHA256" ]]; then
+            echo
+            echo "❌ Keine gültige SHA256-Prüfsumme gefunden."
+            exit 1
+          fi
+
+          echo
+          echo "Offizielle SHA256:"
+          echo "$EXPECTED_SHA256"
+
+          echo "DRAGONOS_SHA256=$EXPECTED_SHA256" >> "$GITHUB_ENV"
+
+      # ============================================================
+      # SHA256 prüfen
+      # ============================================================
+
+      - name: 🔐 DragonOS Image SHA256 prüfen
         shell: bash
         run: |
           set -euo pipefail
 
           echo "Berechne SHA256..."
 
-          ACTUAL_SHA256="$(sha256sum "$IMAGE_GZ" | awk '{print $1}')"
+          ACTUAL_SHA256="$(
+            sha256sum "$IMAGE_GZ" |
+            awk '{print tolower($1)}'
+          )"
 
+          echo
           echo "Erwartet:"
           echo "$DRAGONOS_SHA256"
 
+          echo
           echo "Gefunden:"
           echo "$ACTUAL_SHA256"
 
           if [[ "$ACTUAL_SHA256" != "$DRAGONOS_SHA256" ]]; then
+            echo
             echo "❌ SHA256-Prüfung fehlgeschlagen!"
             exit 1
           fi
 
+          echo
           echo "✅ SHA256 ist korrekt."
 
-      # ------------------------------------------------------------
+      # ============================================================
       # Image entpacken
-      # ------------------------------------------------------------
+      # ============================================================
 
       - name: 📦 DragonOS Image entpacken
         shell: bash
@@ -128,12 +183,12 @@ jobs:
           fi
 
           echo
-          echo "Image:"
+          echo "DragonOS Image:"
           ls -lh "$IMAGE"
 
-      # ------------------------------------------------------------
-      # PINN Tarballs
-      # ------------------------------------------------------------
+      # ============================================================
+      # PINN Tarballs erzeugen
+      # ============================================================
 
       - name: 🔧 PINN Tarballs erzeugen
         shell: bash
@@ -174,21 +229,32 @@ jobs:
 
           trap cleanup EXIT
 
-          # ----------------------------------------------------------
-          # Haupt-Loopdevice nur für Partitionserkennung
-          # ----------------------------------------------------------
+          # ========================================================
+          # Haupt-Loopdevice
+          # ========================================================
 
-          LOOPDEV="$(sudo losetup --find --show --read-only "$IMAGE")"
+          echo
+          echo "==> Loopdevice erstellen"
+
+          LOOPDEV="$(
+            sudo losetup \
+              --find \
+              --show \
+              --read-only \
+              "$IMAGE"
+          )"
 
           echo "Loopdevice: $LOOPDEV"
 
-          SECTOR_SIZE="$(sudo blockdev --getss "$LOOPDEV")"
+          SECTOR_SIZE="$(
+            sudo blockdev --getss "$LOOPDEV"
+          )"
 
           echo "Sektorgröße: $SECTOR_SIZE Bytes"
 
-          # ----------------------------------------------------------
+          # ========================================================
           # Partitionstabelle
-          # ----------------------------------------------------------
+          # ========================================================
 
           echo
           echo "===== Partitionstabelle ====="
@@ -197,12 +263,12 @@ jobs:
 
           PART1="$(
             sudo parted -ms "$LOOPDEV" unit s print |
-            awk -F: '$1 ~ /^[0-9]+$/ && $1 == 1 {print}'
+            awk -F: '$1 == "1" {print}'
           )"
 
           PART2="$(
             sudo parted -ms "$LOOPDEV" unit s print |
-            awk -F: '$1 ~ /^[0-9]+$/ && $1 == 2 {print}'
+            awk -F: '$1 == "2" {print}'
           )"
 
           if [[ -z "$PART1" ]]; then
@@ -223,22 +289,40 @@ jobs:
           echo "Partition 2:"
           echo "$PART2"
 
-          # ----------------------------------------------------------
+          # ========================================================
           # Partitionen auslesen
-          # ----------------------------------------------------------
+          # ========================================================
 
-          PART1_FS="$(echo "$PART1" | cut -d: -f5)"
-          PART2_FS="$(echo "$PART2" | cut -d: -f5)"
+          PART1_FS="$(echo "$PART1" | cut -d: -f6)"
+          PART2_FS="$(echo "$PART2" | cut -d: -f6)"
 
-          PART1_START="$(echo "$PART1" | cut -d: -f2 | sed 's/s$//')"
-          PART1_END="$(echo "$PART1" | cut -d: -f3 | sed 's/s$//')"
+          PART1_START="$(
+            echo "$PART1" |
+            cut -d: -f2 |
+            sed 's/s$//'
+          )"
 
-          PART2_START="$(echo "$PART2" | cut -d: -f2 | sed 's/s$//')"
-          PART2_END="$(echo "$PART2" | cut -d: -f3 | sed 's/s$//')"
+          PART1_END="$(
+            echo "$PART1" |
+            cut -d: -f3 |
+            sed 's/s$//'
+          )"
 
-          # ----------------------------------------------------------
-          # Dateisysteme prüfen
-          # ----------------------------------------------------------
+          PART2_START="$(
+            echo "$PART2" |
+            cut -d: -f2 |
+            sed 's/s$//'
+          )"
+
+          PART2_END="$(
+            echo "$PART2" |
+            cut -d: -f3 |
+            sed 's/s$//'
+          )"
+
+          # ========================================================
+          # Partitionstypen prüfen
+          # ========================================================
 
           PART1_FS_LOWER="$(echo "$PART1_FS" | tr '[:upper:]' '[:lower:]')"
           PART2_FS_LOWER="$(echo "$PART2_FS" | tr '[:upper:]' '[:lower:]')"
@@ -247,8 +331,8 @@ jobs:
                 "$PART1_FS_LOWER" != "fat16" &&
                 "$PART1_FS_LOWER" != "fat" ]]; then
 
-            echo "❌ Partition 1 ist nicht FAT."
-            echo "   Gefunden: $PART1_FS"
+            echo "❌ Partition 1 ist kein FAT-Dateisystem."
+            echo "Gefunden: $PART1_FS"
             exit 1
           fi
 
@@ -257,13 +341,13 @@ jobs:
                 "$PART2_FS_LOWER" != "ext2" ]]; then
 
             echo "❌ Partition 2 ist kein Linux-Dateisystem."
-            echo "   Gefunden: $PART2_FS"
+            echo "Gefunden: $PART2_FS"
             exit 1
           fi
 
-          # ----------------------------------------------------------
+          # ========================================================
           # Größen berechnen
-          # ----------------------------------------------------------
+          # ========================================================
 
           BOOT_SECTORS=$((PART1_END - PART1_START + 1))
           ROOT_SECTORS=$((PART2_END - PART2_START + 1))
@@ -271,8 +355,13 @@ jobs:
           BOOT_PARTITION_BYTES=$((BOOT_SECTORS * SECTOR_SIZE))
           ROOT_PARTITION_BYTES=$((ROOT_SECTORS * SECTOR_SIZE))
 
-          BOOT_PARTITION_MIB=$((BOOT_PARTITION_BYTES / 1024 / 1024))
-          ROOT_PARTITION_MIB=$((ROOT_PARTITION_BYTES / 1024 / 1024))
+          BOOT_PARTITION_MIB=$(
+            (BOOT_PARTITION_BYTES / 1024 / 1024)
+          )
+
+          ROOT_PARTITION_MIB=$(
+            (ROOT_PARTITION_BYTES / 1024 / 1024)
+          )
 
           BOOT_OFFSET=$((PART1_START * SECTOR_SIZE))
           ROOT_OFFSET=$((PART2_START * SECTOR_SIZE))
@@ -282,30 +371,25 @@ jobs:
 
           echo
           echo "BOOT"
-          echo "  Start       : $PART1_START"
-          echo "  Ende        : $PART1_END"
-          echo "  Sektoren    : $BOOT_SECTORS"
-          echo "  Größe       : $BOOT_PARTITION_MIB MiB"
-          echo "  Offset      : $BOOT_OFFSET Bytes"
-          echo "  Filesystem  : $PART1_FS"
+          echo "  Start      : $PART1_START"
+          echo "  Ende       : $PART1_END"
+          echo "  Sektoren   : $BOOT_SECTORS"
+          echo "  Größe      : $BOOT_PARTITION_MIB MiB"
+          echo "  Offset     : $BOOT_OFFSET Bytes"
+          echo "  Filesystem : $PART1_FS"
 
           echo
           echo "ROOT"
-          echo "  Start       : $PART2_START"
-          echo "  Ende        : $PART2_END"
-          echo "  Sektoren    : $ROOT_SECTORS"
-          echo "  Größe       : $ROOT_PARTITION_MIB MiB"
-          echo "  Offset      : $ROOT_OFFSET Bytes"
-          echo "  Filesystem  : $PART2_FS"
+          echo "  Start      : $PART2_START"
+          echo "  Ende       : $PART2_END"
+          echo "  Sektoren   : $ROOT_SECTORS"
+          echo "  Größe      : $ROOT_PARTITION_MIB MiB"
+          echo "  Offset     : $ROOT_OFFSET Bytes"
+          echo "  Filesystem : $PART2_FS"
 
-          # ----------------------------------------------------------
-          # Separate Loopdevices für die Partitionen
-          #
-          # WICHTIG:
-          # Kein "mount -o loop".
-          # Dadurch vermeiden wir den bisherigen
-          # "overlapping loop device exists"-Fehler.
-          # ----------------------------------------------------------
+          # ========================================================
+          # Separate Loopdevice für BOOT
+          # ========================================================
 
           echo
           echo "==> Boot Loopdevice erstellen"
@@ -322,6 +406,10 @@ jobs:
 
           echo "BOOT Loopdevice: $BOOT_LOOPDEV"
 
+          # ========================================================
+          # Separate Loopdevice für ROOT
+          # ========================================================
+
           echo
           echo "==> Root Loopdevice erstellen"
 
@@ -337,82 +425,67 @@ jobs:
 
           echo "ROOT Loopdevice: $ROOT_LOOPDEV"
 
-          # ----------------------------------------------------------
+          # ========================================================
           # Mount
-          # ----------------------------------------------------------
-
-          sudo mount -o ro "$BOOT_LOOPDEV" "$BOOT"
-          sudo mount -o ro "$ROOT_LOOPDEV" "$ROOT"
+          #
+          # KEIN mount -o loop!
+          # ========================================================
 
           echo
-          echo "===== BOOT Inhalt ====="
+          echo "==> Mount Boot readonly"
+
+          sudo mount \
+            -o ro \
+            "$BOOT_LOOPDEV" \
+            "$BOOT"
+
+          echo
+          echo "==> Mount Root readonly"
+
+          sudo mount \
+            -o ro \
+            "$ROOT_LOOPDEV" \
+            "$ROOT"
+
+          # ========================================================
+          # Dateien prüfen
+          # ========================================================
+
+          echo
+          echo "===== BOOT ====="
+
           sudo ls -la "$BOOT" | head -40
 
           echo
-          echo "===== ROOT Inhalt ====="
-          sudo ls -la "$ROOT" | head -40
+          echo "===== ROOT ====="
 
-          # ----------------------------------------------------------
-          # Sicherheitsprüfung
-          # ----------------------------------------------------------
+          sudo ls -la "$ROOT" | head -40
 
           for DIR in bin etc usr var; do
             if [[ ! -d "$ROOT/$DIR" ]]; then
-              echo "❌ Root-Dateisystem ist ungültig."
-              echo "   Fehlendes Verzeichnis: $ROOT/$DIR"
+              echo
+              echo "❌ Root-Dateisystem ungültig."
+              echo "Fehlendes Verzeichnis: $ROOT/$DIR"
               exit 1
             fi
           done
 
           echo
-          echo "✅ Root-Dateisystem erfolgreich erkannt."
+          echo "✅ Root-Dateisystem erkannt."
 
-          # ----------------------------------------------------------
-          # Tarballs erzeugen
-          # ----------------------------------------------------------
+          # ========================================================
+          # Dateigrößen VOR dem Unmount ermitteln
+          # ========================================================
 
-          echo
-          echo "==> Erzeuge boot.tar.xz"
+          BOOT_RAW_BYTES="$(
+            sudo du -sb "$BOOT" |
+            awk '{print $1}'
+          )"
 
-          sudo tar \
-            --xattrs \
-            --acls \
-            --numeric-owner \
-            --one-file-system \
-            -C "$BOOT" \
-            -cJf "$PWD/boot.tar.xz" .
-
-          echo
-          echo "==> Erzeuge root.tar.xz"
-
-          sudo tar \
-            --xattrs \
-            --acls \
-            --numeric-owner \
-            --one-file-system \
-            --exclude="./lost+found" \
-            -C "$ROOT" \
-            -cJf "$PWD/root.tar.xz" .
-
-          # ----------------------------------------------------------
-          # Unmount
-          # ----------------------------------------------------------
-
-          sudo umount "$BOOT"
-          sudo umount "$ROOT"
-
-          sudo losetup -d "$BOOT_LOOPDEV"
-          BOOT_LOOPDEV=""
-
-          sudo losetup -d "$ROOT_LOOPDEV"
-          ROOT_LOOPDEV=""
-
-          # ----------------------------------------------------------
-          # Größen
-          # ----------------------------------------------------------
-
-          BOOT_RAW_BYTES="$(sudo du -sb "$BOOT" 2>/dev/null | awk '{print $1}')"
-          ROOT_RAW_BYTES="$(sudo du -sb "$ROOT" 2>/dev/null | awk '{print $1}')"
+          ROOT_RAW_BYTES="$(
+            sudo du -sb "$ROOT" |
+            awk '{print $1}'
+          )"
 
           BOOT_UNCOMPRESSED_MIB=$(
             (
@@ -426,69 +499,95 @@ jobs:
             ) / 1024 / 1024
           )
 
-          # ----------------------------------------------------------
-          # PINN benötigt etwas zusätzlichen Platz
-          # ----------------------------------------------------------
+          # ========================================================
+          # Tarballs
+          # ========================================================
 
-          BOOT_NOMINAL=$((BOOT_UNCOMPRESSED_MIB + 100))
-          ROOT_NOMINAL=$((ROOT_UNCOMPRESSED_MIB + 400))
+          echo
+          echo "==> boot.tar.xz erzeugen"
 
-          NOMINAL_SIZE=$((BOOT_NOMINAL + ROOT_NOMINAL))
+          sudo tar \
+            --xattrs \
+            --acls \
+            --numeric-owner \
+            --one-file-system \
+            -C "$BOOT" \
+            -cJf "$PWD/boot.tar.xz" \
+            .
+
+          echo
+          echo "==> root.tar.xz erzeugen"
+
+          sudo tar \
+            --xattrs \
+            --acls \
+            --numeric-owner \
+            --one-file-system \
+            --exclude="./lost+found" \
+            -C "$ROOT" \
+            -cJf "$PWD/root.tar.xz" \
+            .
+
+          # ========================================================
+          # Unmount
+          # ========================================================
+
+          echo
+          echo "==> Unmount"
+
+          sudo umount "$BOOT"
+          sudo umount "$ROOT"
+
+          sudo losetup -d "$BOOT_LOOPDEV"
+          BOOT_LOOPDEV=""
+
+          sudo losetup -d "$ROOT_LOOPDEV"
+          ROOT_LOOPDEV=""
+
+          # ========================================================
+          # Tarball Größen
+          # ========================================================
 
           BOOT_SIZE="$(stat -c%s boot.tar.xz)"
           ROOT_SIZE="$(stat -c%s root.tar.xz)"
 
           DOWNLOAD_SIZE=$((BOOT_SIZE + ROOT_SIZE))
 
-          BOOT_SHA256="$(sha256sum boot.tar.xz | awk '{print $1}')"
-          ROOT_SHA256="$(sha256sum root.tar.xz | awk '{print $1}')"
+          # ========================================================
+          # PINN Größen
+          # ========================================================
 
-          # ----------------------------------------------------------
-          # Ausgabe
-          # ----------------------------------------------------------
+          BOOT_NOMINAL=$((BOOT_UNCOMPRESSED_MIB + 100))
+          ROOT_NOMINAL=$((ROOT_UNCOMPRESSED_MIB + 400))
 
-          echo
-          echo "======================================"
-          echo "        PINN BUILD ERGEBNIS"
-          echo "======================================"
+          NOMINAL_SIZE=$((BOOT_NOMINAL + ROOT_NOMINAL))
 
-          echo
-          echo "BOOT:"
-          echo "  Partition : ${BOOT_PARTITION_MIB} MiB"
-          echo "  Daten     : ${BOOT_UNCOMPRESSED_MIB} MiB"
-          echo "  Nominal   : ${BOOT_NOMINAL} MiB"
-          echo "  Tarball   : ${BOOT_SIZE} Bytes"
-          echo "  SHA256    : ${BOOT_SHA256}"
+          # ========================================================
+          # SHA256
+          # ========================================================
 
-          echo
-          echo "ROOT:"
-          echo "  Partition : ${ROOT_PARTITION_MIB} MiB"
-          echo "  Daten     : ${ROOT_UNCOMPRESSED_MIB} MiB"
-          echo "  Nominal   : ${ROOT_NOMINAL} MiB"
-          echo "  Tarball   : ${ROOT_SIZE} Bytes"
-          echo "  SHA256    : ${ROOT_SHA256}"
+          BOOT_SHA256="$(
+            sha256sum boot.tar.xz |
+            awk '{print $1}'
+          )"
 
-          echo
-          echo "PINN:"
-          echo "  Nominal Size : ${NOMINAL_SIZE} MiB"
-          echo "  Download     : ${DOWNLOAD_SIZE} Bytes"
+          ROOT_SHA256="$(
+            sha256sum root.tar.xz |
+            awk '{print $1}'
+          )"
 
-          # ----------------------------------------------------------
+          # ========================================================
           # SHA256SUMS
-          # ----------------------------------------------------------
+          # ========================================================
 
           sha256sum \
             boot.tar.xz \
             root.tar.xz \
             > SHA256SUMS
 
-          echo
-          echo "===== SHA256SUMS ====="
-          cat SHA256SUMS
-
-          # ----------------------------------------------------------
-          # Werte für spätere Schritte
-          # ----------------------------------------------------------
+          # ========================================================
+          # GitHub Environment
+          # ========================================================
 
           {
             echo "BOOT_PARTITION_SIZE=$BOOT_PARTITION_MIB"
@@ -510,12 +609,46 @@ jobs:
             echo "ROOT_SHA256=$ROOT_SHA256"
           } >> "$GITHUB_ENV"
 
-          echo
-          echo "✅ DragonOS Pi64 erfolgreich in PINN-Tarballs konvertiert."
+          # ========================================================
+          # Ausgabe
+          # ========================================================
 
-      # ------------------------------------------------------------
-      # PINN Metadaten erzeugen
-      # ------------------------------------------------------------
+          echo
+          echo "=========================================="
+          echo "       DRAGONOS → PINN BUILD"
+          echo "=========================================="
+
+          echo
+          echo "BOOT:"
+          echo "  Partition:       ${BOOT_PARTITION_MIB} MiB"
+          echo "  Daten:           ${BOOT_UNCOMPRESSED_MIB} MiB"
+          echo "  Nominal:         ${BOOT_NOMINAL} MiB"
+          echo "  Tarball:         ${BOOT_SIZE} Bytes"
+          echo "  SHA256:          ${BOOT_SHA256}"
+
+          echo
+          echo "ROOT:"
+          echo "  Partition:       ${ROOT_PARTITION_MIB} MiB"
+          echo "  Daten:           ${ROOT_UNCOMPRESSED_MIB} MiB"
+          echo "  Nominal:         ${ROOT_NOMINAL} MiB"
+          echo "  Tarball:         ${ROOT_SIZE} Bytes"
+          echo "  SHA256:          ${ROOT_SHA256}"
+
+          echo
+          echo "PINN:"
+          echo "  Nominal Size:    ${NOMINAL_SIZE} MiB"
+          echo "  Download Size:   ${DOWNLOAD_SIZE} Bytes"
+
+          echo
+          echo "=========================================="
+          echo "SHA256SUMS"
+          echo "=========================================="
+
+          cat SHA256SUMS
+
+      # ============================================================
+      # PINN Metadaten
+      # ============================================================
 
       - name: 📝 PINN Metadaten erzeugen
         shell: bash
@@ -533,8 +666,7 @@ jobs:
                 "partition_size_nominal": ${BOOT_NOMINAL},
                 "want_maximised": false,
                 "uncompressed_tarball_size": ${BOOT_UNCOMPRESSED},
-                "requires_partition_number": 1,
-                "sha256sum": "${BOOT_SHA256}"
+                "requiresPartitionNumber": 1
               },
               {
                 "label": "root",
@@ -542,8 +674,7 @@ jobs:
                 "partition_size_nominal": ${ROOT_NOMINAL},
                 "want_maximised": true,
                 "uncompressed_tarball_size": ${ROOT_UNCOMPRESSED},
-                "requires_partition_number": 2,
-                "sha256sum": "${ROOT_SHA256}"
+                "requiresPartitionNumber": 2
               }
             ]
           }
@@ -561,11 +692,12 @@ jobs:
               "Compute Module 4",
               "Compute Module 5"
             ],
-            "nominal_size": ${NOMINAL_SIZE},
-            "download_size": ${DOWNLOAD_SIZE},
+            "release_date": "2026-10-05",
             "version": "Beta42",
-            "release_date": "2025-10-06",
-            "group": "General"
+            "group": "General",
+            "supports_backup": false,
+            "download_size": ${DOWNLOAD_SIZE},
+            "nominal_size": ${NOMINAL_SIZE}
           }
           EOF
 
@@ -577,9 +709,9 @@ jobs:
           echo "===== os.json ====="
           cat pinn/os.json
 
-      # ------------------------------------------------------------
-      # Release anlegen / aktualisieren
-      # ------------------------------------------------------------
+      # ============================================================
+      # GitHub Release
+      # ============================================================
 
       - name: 🚀 GitHub Release erstellen oder aktualisieren
         env:
@@ -588,21 +720,19 @@ jobs:
         run: |
           set -euo pipefail
 
-          TAG="$RELEASE_TAG"
-
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "Release $TAG existiert bereits."
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Release $RELEASE_TAG existiert bereits."
           else
-            echo "Erstelle Release $TAG ..."
+            echo "Erstelle Release $RELEASE_TAG ..."
 
-            gh release create "$TAG" \
+            gh release create "$RELEASE_TAG" \
               --title "DragonOS Pi64 Beta42 for PINN" \
               --notes "DragonOS Pi64 Beta42 PINN release."
           fi
 
-      # ------------------------------------------------------------
-      # PINN Dateien als Release Assets hochladen
-      # ------------------------------------------------------------
+      # ============================================================
+      # Release Assets
+      # ============================================================
 
       - name: 📤 PINN Dateien zum GitHub Release hochladen
         env:
@@ -617,9 +747,9 @@ jobs:
             SHA256SUMS \
             --clobber
 
-      # ------------------------------------------------------------
-      # Build-Artefakte zusätzlich für den Workflow aufbewahren
-      # ------------------------------------------------------------
+      # ============================================================
+      # Workflow Artefakte
+      # ============================================================
 
       - name: 📦 Build-Artefakte speichern
         uses: actions/upload-artifact@v4
@@ -633,11 +763,11 @@ jobs:
             pinn/os.json
             pinn/partitions.json
 
-      # ------------------------------------------------------------
-      # Zusammenfassung
-      # ------------------------------------------------------------
+      # ============================================================
+      # Summary
+      # ============================================================
 
-      - name: 📋 Zusammenfassung
+      - name: 📋 Build-Zusammenfassung
         shell: bash
         run: |
           {
@@ -649,6 +779,8 @@ jobs:
             echo "| root.tar.xz | ${ROOT_SIZE} Bytes |"
             echo
             echo "**PINN nominal size:** ${NOMINAL_SIZE} MiB"
+            echo
+            echo "**Download size:** ${DOWNLOAD_SIZE} Bytes"
             echo
             echo "**Release:** ${RELEASE_TAG}"
           } >> "$GITHUB_STEP_SUMMARY"
