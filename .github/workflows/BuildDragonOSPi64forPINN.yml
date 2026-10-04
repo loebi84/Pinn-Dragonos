@@ -315,31 +315,23 @@ echo
 echo"=====Tarballs====="
 ls-lhboot.tar.xzroot.tar.xz
 #------------------------------------------------------------
-#12.TarballsalsWorkflow-Artefaktspeichern
-#------------------------------------------------------------
--name:📦TarballsalsArtifact
-uses:actions/upload-artifact@v4
-with:
-name:DragonOS-Pi64-Beta42-PINN-Tarballs
-path:|
-boot.tar.xz
-root.tar.xz
-retention-days:7
-#------------------------------------------------------------
-#13.PINN-MetadateninsReposchreiben
-#------------------------------------------------------------
--name:⬆️PINNMetadatencommitten
-run:|
-gitconfiguser.name"LöbiBot"
-gitconfiguser.email"bot@dragonos.local"
-gitadd\
-PINN_DragonOS_Repo_unzipped/os_list_v3.json\
-PINN_DragonOS_Repo_unzipped/dragonos-pinn-repo/dragonos/os.json\
-PINN_DragonOS_Repo_unzipped/dragonos-pinn-repo/dragonos/partitions.json
-ifgitdiff--cached--quiet;then
-echo"KeineMetadatenänderung."
-else
-gitcommit-m"🐉UpdatePINNmetadataforDragonOSBeta42"
-gitpush
-fi
+      # ------------------------------------------------------------
+      # 12. GitHub Release erstellen / aktualisieren
+      # ------------------------------------------------------------
 
+      - name: 🚀 DragonOS PINN Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: dragonos-pi64-beta42
+          name: DragonOS Pi64 Beta42 – PINN
+          body: |
+            Automatisch erzeugte PINN-Tarballs für DragonOS Pi64 Beta42.
+
+            Enthalten:
+            - boot.tar.xz
+            - root.tar.xz
+          files: |
+            boot.tar.xz
+            root.tar.xz
+          fail_on_unmatched_files: true
+          overwrite_files: true
