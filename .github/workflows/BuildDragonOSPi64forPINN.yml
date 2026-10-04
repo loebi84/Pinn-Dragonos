@@ -454,34 +454,71 @@ jobs:
             exit 1
           fi
 
+                 # ------------------------------------------------------
+          # Boot-Partition als eigenes Loopdevice einhängen
           # ------------------------------------------------------
-          # Boot readonly mounten
+
+          echo
+          echo "==> Erzeuge Boot-Loopdevice"
+
+          BOOT_LOOPDEV=$(
+            sudo losetup \
+              --find \
+              --show \
+              --read-only \
+              --offset "$BOOT_OFFSET" \
+              --sizelimit "$BOOT_PARTITION_BYTES" \
+              "$IMAGE"
+          )
+
+          echo "Boot Loopdevice: $BOOT_LOOPDEV"
+
+          # ------------------------------------------------------
+          # Boot mounten
           # ------------------------------------------------------
 
           echo
           echo "==> Mount Boot readonly"
 
           sudo mount \
-            -o loop,ro,offset="$BOOT_OFFSET" \
-            "$IMAGE" \
+            -o ro \
+            "$BOOT_LOOPDEV" \
             "$BOOT"
 
           MOUNTED_BOOT=1
 
           # ------------------------------------------------------
-          # Root readonly mounten
+          # Root-Partition als eigenes Loopdevice einhängen
+          # ------------------------------------------------------
+
+          echo
+          echo "==> Erzeuge Root-Loopdevice"
+
+          ROOT_LOOPDEV=$(
+            sudo losetup \
+              --find \
+              --show \
+              --read-only \
+              --offset "$ROOT_OFFSET" \
+              --sizelimit "$ROOT_PARTITION_BYTES" \
+              "$IMAGE"
+          )
+
+          echo "Root Loopdevice: $ROOT_LOOPDEV"
+
+          # ------------------------------------------------------
+          # Root mounten
           # ------------------------------------------------------
 
           echo
           echo "==> Mount Root readonly"
 
           sudo mount \
-            -o loop,ro,noload,offset="$ROOT_OFFSET" \
-            "$IMAGE" \
+            -o ro \
+            "$ROOT_LOOPDEV" \
             "$ROOT"
 
           MOUNTED_ROOT=1
-
           # ------------------------------------------------------
           # Root-Struktur prüfen
           # ------------------------------------------------------
