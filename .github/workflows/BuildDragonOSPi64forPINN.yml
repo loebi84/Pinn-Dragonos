@@ -416,8 +416,8 @@ jobs:
           BOOT_PARTITION_MIB=$((BOOT_PARTITION_BYTES / 1024 / 1024))
           ROOT_PARTITION_MIB=$((ROOT_PARTITION_BYTES / 1024 / 1024))
 
-         BOOT_OFFSET=$((BOOT_START * SECTOR_SIZE))
-         ROOT_OFFSET=$((ROOT_START * SECTOR_SIZE))
+          BOOT_OFFSET=$((BOOT_START * SECTOR_SIZE))
+          ROOT_OFFSET=$((ROOT_START * SECTOR_SIZE))
 
 
           
@@ -585,30 +585,19 @@ jobs:
               wc -c
           )
 
-          # MiB aufrunden
-          BOOT_UNCOMPRESSED_MIB=$(
-            ( (BOOT_RAW_BYTES + 1024 * 1024 - 1) / 1024 / 1024 )
-          )
+          BOOT_UNCOMPRESSED_MIB=$(( (BOOT_RAW_BYTES + 1024 * 1024 - 1) / 1024 / 1024 ))
 
-          ROOT_UNCOMPRESSED_MIB=$(
-            ( (ROOT_RAW_BYTES + 1024 * 1024 - 1) / 1024 / 1024 )
-          )
+          ROOT_UNCOMPRESSED_MIB=$(( (ROOT_RAW_BYTES + 1024 * 1024 - 1) / 1024 / 1024 ))
 
-          # ------------------------------------------------------
-          # PINN Größen
-          # ------------------------------------------------------
+          BOOT_NOMINAL=$((BOOT_UNCOMPRESSED_MIB + 100))
 
-          BOOT_NOMINAL=$(
-            (BOOT_UNCOMPRESSED_MIB + 100)
-          )
+          ROOT_NOMINAL=$((ROOT_UNCOMPRESSED_MIB + 500))
 
-          ROOT_NOMINAL=$(
-            (ROOT_UNCOMPRESSED_MIB + 500)
-          )
+          NOMINAL_SIZE=$((BOOT_NOMINAL + ROOT_NOMINAL))
 
-          NOMINAL_SIZE=$(
-            (BOOT_NOMINAL + ROOT_NOMINAL)
-          )
+          DOWNLOAD_SIZE=$((BOOT_SIZE + ROOT_SIZE))
+
+          
 
           # ------------------------------------------------------
           # Tarball Größen / Checksums
