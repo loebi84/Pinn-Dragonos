@@ -255,12 +255,12 @@ jobs:
           BOOT_PARTITION_SIZE=$(
             (PART1_END - PART1_START + 1) \
             * SECTOR_SIZE / 1024 / 1024
-          )
+          ))
 
           ROOT_PARTITION_SIZE=$(
             (PART2_END - PART2_START + 1) \
             * SECTOR_SIZE / 1024 / 1024
-          )
+          ))
 
           BOOT_NOMINAL=$((BOOT_UNCOMPRESSED + 100))
           ROOT_NOMINAL=$((ROOT_UNCOMPRESSED + 400))
