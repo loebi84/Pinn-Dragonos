@@ -25,24 +25,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-
-      # ----------------------------------------------------------
-      # 1. Repository
-      # ----------------------------------------------------------
-
       - name: 📥 Repository klonen
         uses: actions/checkout@v4
-
-      # ----------------------------------------------------------
-      # 2. Benötigte Tools
-      # ----------------------------------------------------------
+        with:
+          fetch-depth: 0
 
       - name: 🔧 Benötigte Tools installieren
+        shell: bash
         run: |
-          set -euo pipefail
-
+          set -Eeuo pipefail
           sudo apt-get update
-
           sudo apt-get install -y \
             xz-utils \
             parted \
@@ -54,14 +46,10 @@ jobs:
             curl \
             openssh-client
 
-      # ----------------------------------------------------------
-      # 3. DragonOS herunterladen
-      # ----------------------------------------------------------
-
       - name: 📥 DragonOS Pi64 Beta42 herunterladen
         shell: bash
         run: |
-          set -euo pipefail
+          set -Eeuo pipefail
 
           echo "==> Download DragonOS Pi64 Beta42"
 
@@ -88,18 +76,14 @@ jobs:
           echo "Download erfolgreich:"
           ls -lh "$IMAGE_GZ"
 
-      # ----------------------------------------------------------
-      # 4. Image entpacken
-      # ----------------------------------------------------------
-
       - name: 📦 DragonOS Image entpacken
         shell: bash
         run: |
-          set -euo pipefail
+          set -Eeuo pipefail
 
           echo "==> Entpacke $IMAGE_GZ"
 
-          gzip -dc "$IMAGE_GZ.tmp" > /dev/null 2>/dev/null || true
+          gzip -t "$IMAGE_GZ"
 
           gzip -dc "$IMAGE_GZ" > "$IMAGE.tmp"
 
@@ -114,10 +98,6 @@ jobs:
           echo
           echo "Image-Typ:"
           file "$IMAGE"
-
-      # ----------------------------------------------------------
-      # 5. Partitionen erkennen, mounten und Tarballs erzeugen
-      # ----------------------------------------------------------
 
       - name: 🔍 Partitionen erkennen und PINN-Tarballs erzeugen
         shell: bash
@@ -155,21 +135,12 @@ jobs:
 
           trap cleanup_mounts EXIT
 
-          # ------------------------------------------------------
-          # Image prüfen
-          # ------------------------------------------------------
-
           if [[ ! -f "$IMAGE" || ! -s "$IMAGE" ]]; then
             echo "❌ Image fehlt oder ist leer: $IMAGE"
             exit 1
           fi
 
-          # ------------------------------------------------------
-          # Sektorgröße
-          # ------------------------------------------------------
-
           SECTOR_SIZE=$(sudo blockdev --getss "$IMAGE")
-
           if [[ ! "$SECTOR_SIZE" =~ ^[0-9]+$ || "$SECTOR_SIZE" -le 0 ]]; then
             echo "❌ Ungültige Sektorgröße: '$SECTOR_SIZE'"
             exit 1
@@ -177,17 +148,12 @@ jobs:
 
           echo "Sektorgröße: ${SECTOR_SIZE} Bytes"
 
-          # ------------------------------------------------------
-          # Partitionstabelle
-          # ------------------------------------------------------
-
           echo
           echo "=============================="
           echo "Partitionstabelle"
           echo "=============================="
 
           sudo parted -s "$IMAGE" unit s print
-
           PARTED_OUTPUT=$(sudo parted -ms "$IMAGE" unit s print)
 
           PARTITION_LINES=$(
@@ -203,10 +169,6 @@ jobs:
           echo
           echo "Machine-readable Partitionen:"
           echo "$PARTITION_LINES"
-
-          # ------------------------------------------------------
-          # Dateisysteme automatisch erkennen
-          # ------------------------------------------------------
 
           BOOT_PARTITION=""
           ROOT_PARTITION=""
@@ -227,14 +189,12 @@ jobs:
                   BOOT_PARTITION="$NUMBER"
                 fi
                 ;;
-
               ext2|ext3|ext4)
                 if [[ -z "$ROOT_PARTITION" ]]; then
                   ROOT_PARTITION="$NUMBER"
                 fi
                 ;;
             esac
-
           done <<< "$PARTITION_LINES"
 
           if [[ -z "$BOOT_PARTITION" ]]; then
@@ -250,10 +210,6 @@ jobs:
           echo
           echo "✅ Boot-Partition : $BOOT_PARTITION"
           echo "✅ Root-Partition : $ROOT_PARTITION"
-
-          # ------------------------------------------------------
-          # Partitionsdaten auslesen
-          # ------------------------------------------------------
 
           get_partition_field() {
             local number="$1"
@@ -289,18 +245,11 @@ jobs:
 
           BOOT_START=$(get_partition_field "$BOOT_PARTITION" 2)
           BOOT_END=$(get_partition_field "$BOOT_PARTITION" 3)
-
           ROOT_START=$(get_partition_field "$ROOT_PARTITION" 2)
           ROOT_END=$(get_partition_field "$ROOT_PARTITION" 3)
 
-          for VALUE_NAME in \
-            BOOT_START \
-            BOOT_END \
-            ROOT_START \
-            ROOT_END
-          do
+          for VALUE_NAME in BOOT_START BOOT_END ROOT_START ROOT_END; do
             VALUE="${!VALUE_NAME}"
-
             if [[ ! "$VALUE" =~ ^[0-9]+$ ]]; then
               echo "❌ Ungültiger Wert für $VALUE_NAME: '$VALUE'"
               exit 1
@@ -309,26 +258,10 @@ jobs:
 
           BOOT_SECTORS=$((BOOT_END - BOOT_START + 1))
           ROOT_SECTORS=$((ROOT_END - ROOT_START + 1))
-
-          BOOT_PARTITION_BYTES=$(
-            (BOOT_SECTORS * SECTOR_SIZE)
-          )
-
-          ROOT_PARTITION_BYTES=$(
-            (ROOT_SECTORS * SECTOR_SIZE)
-          )
-
-          BOOT_PARTITION_MIB=$(
-            (BOOT_PARTITION_BYTES / 1024 / 1024)
-          )
-
-          ROOT_PARTITION_MIB=$(
-            (ROOT_PARTITION_BYTES / 1024 / 1024)
-          )
-
-          # ------------------------------------------------------
-          # Sicherheitsprüfung Root
-          # ------------------------------------------------------
+          BOOT_PARTITION_BYTES=$((BOOT_SECTORS * SECTOR_SIZE))
+          ROOT_PARTITION_BYTES=$((ROOT_SECTORS * SECTOR_SIZE))
+          BOOT_PARTITION_MIB=$((BOOT_PARTITION_BYTES / 1024 / 1024))
+          ROOT_PARTITION_MIB=$((ROOT_PARTITION_BYTES / 1024 / 1024))
 
           if (( ROOT_PARTITION_BYTES < 1024 * 1024 * 1024 )); then
             echo "❌ Root-Partition ist kleiner als 1 GiB."
@@ -355,10 +288,6 @@ jobs:
           echo "  Ende   : $ROOT_END"
           echo "  Größe  : ${ROOT_PARTITION_MIB} MiB"
 
-          # ------------------------------------------------------
-          # Offsets
-          # ------------------------------------------------------
-
           BOOT_OFFSET=$((BOOT_START * SECTOR_SIZE))
           ROOT_OFFSET=$((ROOT_START * SECTOR_SIZE))
 
@@ -366,55 +295,27 @@ jobs:
           echo "BOOT Offset: $BOOT_OFFSET"
           echo "ROOT Offset: $ROOT_OFFSET"
 
-          # ------------------------------------------------------
-          # Boot readonly mounten
-          # ------------------------------------------------------
-
           echo
           echo "==> Mount Boot readonly"
-
-          sudo mount \
-            -o loop,ro,offset="$BOOT_OFFSET" \
-            "$IMAGE" \
-            "$BOOT"
-
+          sudo mount -o loop,ro,offset="$BOOT_OFFSET" "$IMAGE" "$BOOT"
           MOUNTED_BOOT=1
-
-          # ------------------------------------------------------
-          # Root readonly mounten
-          # ------------------------------------------------------
 
           echo
           echo "==> Mount Root readonly"
-
-          sudo mount \
-            -o loop,ro,offset="$ROOT_OFFSET" \
-            "$IMAGE" \
-            "$ROOT"
-
+          sudo mount -o loop,ro,offset="$ROOT_OFFSET" "$IMAGE" "$ROOT"
           MOUNTED_ROOT=1
-
-          # ------------------------------------------------------
-          # Inhalt prüfen
-          # ------------------------------------------------------
 
           echo
           echo "=============================="
           echo "BOOT Inhalt"
           echo "=============================="
-
           sudo ls -la "$BOOT" | head -40
 
           echo
           echo "=============================="
           echo "ROOT Inhalt"
           echo "=============================="
-
           sudo ls -la "$ROOT" | head -40
-
-          # ------------------------------------------------------
-          # Root Linux-Struktur prüfen
-          # ------------------------------------------------------
 
           for DIR in etc usr var; do
             if [[ ! -d "$ROOT/$DIR" ]]; then
@@ -427,13 +328,8 @@ jobs:
           echo
           echo "✅ Root-Partition erfolgreich verifiziert."
 
-          # ------------------------------------------------------
-          # Boot Tarball
-          # ------------------------------------------------------
-
           echo
           echo "==> Erzeuge boot.tar.xz"
-
           sudo tar \
             --xattrs \
             --acls \
@@ -442,13 +338,8 @@ jobs:
             -C "$BOOT" \
             -cJf boot.tar.xz .
 
-          # ------------------------------------------------------
-          # Root Tarball
-          # ------------------------------------------------------
-
           echo
           echo "==> Erzeuge root.tar.xz"
-
           sudo tar \
             --xattrs \
             --acls \
@@ -458,29 +349,17 @@ jobs:
             -C "$ROOT" \
             -cJf root.tar.xz .
 
-          # ------------------------------------------------------
-          # Tarballs testen
-          # ------------------------------------------------------
-
           echo
           echo "==> Prüfe boot.tar.xz"
-
           xz -t boot.tar.xz
           tar -tJf boot.tar.xz >/dev/null
-
           echo "✅ boot.tar.xz OK"
 
           echo
           echo "==> Prüfe root.tar.xz"
-
           xz -t root.tar.xz
           tar -tJf root.tar.xz >/dev/null
-
           echo "✅ root.tar.xz OK"
-
-          # ------------------------------------------------------
-          # Exakte unkomprimierte Tarball-Größen
-          # ------------------------------------------------------
 
           echo
           echo "==> Ermittle unkomprimierte Tarball-Größen"
@@ -508,38 +387,19 @@ jobs:
               wc -c
           )
 
-          BOOT_UNCOMPRESSED_MIB=$(
-            (BOOT_RAW_BYTES + 1024 * 1024 - 1) / 1024 / 1024
-          )
-
-          ROOT_UNCOMPRESSED_MIB=$(
-            (ROOT_RAW_BYTES + 1024 * 1024 - 1) / 1024 / 1024
-          )
-
-          # ------------------------------------------------------
-          # PINN Nominal Sizes
-          # ------------------------------------------------------
+          BOOT_UNCOMPRESSED_MIB=$(((BOOT_RAW_BYTES + 1024 * 1024 - 1) / 1024 / 1024))
+          ROOT_UNCOMPRESSED_MIB=$(((ROOT_RAW_BYTES + 1024 * 1024 - 1) / 1024 / 1024))
 
           BOOT_NOMINAL=$((BOOT_UNCOMPRESSED_MIB + 100))
           ROOT_NOMINAL=$((ROOT_UNCOMPRESSED_MIB + 400))
-
           NOMINAL_SIZE=$((BOOT_NOMINAL + ROOT_NOMINAL))
-
-          # ------------------------------------------------------
-          # Tarball Größen / Checksums
-          # ------------------------------------------------------
 
           BOOT_SIZE=$(stat -c%s boot.tar.xz)
           ROOT_SIZE=$(stat -c%s root.tar.xz)
-
           DOWNLOAD_SIZE=$((BOOT_SIZE + ROOT_SIZE))
 
           BOOT_SHA512=$(sha512sum boot.tar.xz | awk '{print $1}')
           ROOT_SHA512=$(sha512sum root.tar.xz | awk '{print $1}')
-
-          # ------------------------------------------------------
-          # Ausgabe
-          # ------------------------------------------------------
 
           echo
           echo "=============================="
@@ -548,13 +408,10 @@ jobs:
 
           echo "Boot Partition       : ${BOOT_PARTITION_MIB} MiB"
           echo "Root Partition       : ${ROOT_PARTITION_MIB} MiB"
-
           echo "Boot Tar uncompressed: ${BOOT_RAW_BYTES} Bytes"
           echo "Root Tar uncompressed: ${ROOT_RAW_BYTES} Bytes"
-
           echo "Boot nominal         : ${BOOT_NOMINAL} MiB"
           echo "Root nominal         : ${ROOT_NOMINAL} MiB"
-
           echo "Boot tarball         : ${BOOT_SIZE} Bytes"
           echo "Root tarball         : ${ROOT_SIZE} Bytes"
 
@@ -566,42 +423,29 @@ jobs:
           echo "Root SHA512:"
           echo "$ROOT_SHA512"
 
-          # ------------------------------------------------------
-          # Werte exportieren
-          # ------------------------------------------------------
-
           {
             echo "BOOT_PARTITION=$BOOT_PARTITION"
             echo "ROOT_PARTITION=$ROOT_PARTITION"
-
             echo "BOOT_FS=$BOOT_FS"
             echo "ROOT_FS=$ROOT_FS"
-
             echo "BOOT_START=$BOOT_START"
             echo "BOOT_END=$BOOT_END"
             echo "ROOT_START=$ROOT_START"
             echo "ROOT_END=$ROOT_END"
-
             echo "BOOT_OFFSET=$BOOT_OFFSET"
             echo "ROOT_OFFSET=$ROOT_OFFSET"
-
             echo "BOOT_PARTITION_MIB=$BOOT_PARTITION_MIB"
             echo "ROOT_PARTITION_MIB=$ROOT_PARTITION_MIB"
-
             echo "BOOT_RAW_BYTES=$BOOT_RAW_BYTES"
             echo "ROOT_RAW_BYTES=$ROOT_RAW_BYTES"
-
             echo "BOOT_UNCOMPRESSED_MIB=$BOOT_UNCOMPRESSED_MIB"
             echo "ROOT_UNCOMPRESSED_MIB=$ROOT_UNCOMPRESSED_MIB"
-
             echo "BOOT_NOMINAL=$BOOT_NOMINAL"
             echo "ROOT_NOMINAL=$ROOT_NOMINAL"
             echo "NOMINAL_SIZE=$NOMINAL_SIZE"
-
             echo "BOOT_SIZE=$BOOT_SIZE"
             echo "ROOT_SIZE=$ROOT_SIZE"
             echo "DOWNLOAD_SIZE=$DOWNLOAD_SIZE"
-
             echo "BOOT_SHA512=$BOOT_SHA512"
             echo "ROOT_SHA512=$ROOT_SHA512"
           } >> "$GITHUB_ENV"
@@ -609,47 +453,32 @@ jobs:
           echo
           echo "✅ PINN-Tarballs erfolgreich erzeugt."
 
-      # ----------------------------------------------------------
-      # 6. Metadaten erzeugen
-      # ----------------------------------------------------------
-
       - name: 📝 PINN Metadaten erzeugen
         shell: bash
         run: |
           set -Eeuo pipefail
 
-          mkdir -p dragonos
+          if [[ ! -d dragonos ]]; then
+            mkdir -p dragonos
+          fi
 
-          # ------------------------------------------------------
-          # icon.png für Remote-PINN vorbereiten
-          # ------------------------------------------------------
-
-          if [[ -f dragonos/icon.png ]]; then
-            cp dragonos/icon.png "dragonos/${OS_NAME}.png"
-          else
+          if [[ ! -f dragonos/icon.png ]]; then
             echo "❌ dragonos/icon.png fehlt."
             exit 1
           fi
 
-          # ------------------------------------------------------
-          # Marketing-Tar erzeugen
-          # ------------------------------------------------------
-
-          if [[ -f dragonos/slides_vga.png ]]; then
-            tar -C dragonos -cJf dragonos/marketing.tar slides_vga.png
-          else
+          if [[ ! -f dragonos/slides_vga.png ]]; then
             echo "❌ dragonos/slides_vga.png fehlt."
             exit 1
           fi
-
-          # ------------------------------------------------------
-          # partition_setup prüfen
-          # ------------------------------------------------------
 
           if [[ ! -f dragonos/partition_setup.sh ]]; then
             echo "❌ dragonos/partition_setup.sh fehlt."
             exit 1
           fi
+
+          cp dragonos/icon.png "dragonos/${OS_NAME}.png"
+          tar -C dragonos -cJf dragonos/marketing.tar slides_vga.png
 
           chmod +x dragonos/partition_setup.sh
 
@@ -657,10 +486,6 @@ jobs:
             sha512sum dragonos/partition_setup.sh |
             awk '{print $1}'
           )
-
-          # ------------------------------------------------------
-          # partitions.json
-          # ------------------------------------------------------
 
           jq -n \
             --arg boot_label "dragon_boot" \
@@ -695,10 +520,6 @@ jobs:
               ]
             }' > dragonos/partitions.json
 
-          # ------------------------------------------------------
-          # os.json
-          # ------------------------------------------------------
-
           jq -n \
             --arg name "$OS_NAME" \
             --arg version "$OS_VERSION" \
@@ -729,12 +550,7 @@ jobs:
               sha512sum: $sha
             }' > dragonos/os.json
 
-          # ------------------------------------------------------
-          # os_list_v3.json
-          # ------------------------------------------------------
-
           RAW_BASE="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${GITHUB_SHA}/dragonos"
-
           SF_BASE="https://sourceforge.net/projects/${SF_PROJECT}/files/${SF_RELEASE}"
 
           jq -n \
@@ -782,10 +598,6 @@ jobs:
               ]
             }' > os_list_v3.json
 
-          # ------------------------------------------------------
-          # JSON validieren
-          # ------------------------------------------------------
-
           echo
           echo "==> JSON prüfen"
 
@@ -806,10 +618,6 @@ jobs:
           echo
           echo "===== os_list_v3.json ====="
           jq . os_list_v3.json
-
-      # ----------------------------------------------------------
-      # 7. SourceForge vorbereiten
-      # ----------------------------------------------------------
 
       - name: 🔐 SourceForge SSH vorbereiten
         if: ${{ secrets.SF_USERNAME != '' && secrets.SF_SSH_KEY != '' }}
@@ -841,10 +649,6 @@ jobs:
 
           echo "✅ SourceForge SSH vorbereitet."
 
-      # ----------------------------------------------------------
-      # 8. Tarballs nach SourceForge hochladen
-      # ----------------------------------------------------------
-
       - name: 🚀 PINN Tarballs zu SourceForge hochladen
         if: ${{ secrets.SF_USERNAME != '' && secrets.SF_SSH_KEY != '' }}
         shell: bash
@@ -869,29 +673,18 @@ jobs:
           echo
           echo "✅ Tarballs erfolgreich zu SourceForge übertragen."
 
-      # ----------------------------------------------------------
-      # 9. Prüfen, ob SourceForge Secrets vorhanden sind
-      # ----------------------------------------------------------
-
-      - name: ❌ SourceForge Secrets fehlen
+      - name: ⚠️ SourceForge Secrets fehlen
         if: ${{ secrets.SF_USERNAME == '' || secrets.SF_SSH_KEY == '' }}
+        shell: bash
         run: |
-          echo "❌ SF_USERNAME oder SF_SSH_KEY fehlt."
+          echo "⚠️ SF_USERNAME oder SF_SSH_KEY fehlt."
           echo
-          echo "Bitte unter:"
+          echo "Tarballs werden lokal erzeugt und nicht nach SourceForge hochgeladen."
+          echo "Falls du Uploads brauchst, bitte diese Secrets setzen:"
+          echo "  - SF_USERNAME"
+          echo "  - SF_SSH_KEY"
+          echo
           echo "Settings → Secrets and variables → Actions"
-          echo
-          echo "folgende Secrets anlegen:"
-          echo
-          echo "SF_USERNAME"
-          echo "SF_SSH_KEY"
-          echo
-          echo "Der Workflow wird deshalb absichtlich abgebrochen."
-          exit 1
-
-      # ----------------------------------------------------------
-      # 10. Metadaten committen
-      # ----------------------------------------------------------
 
       - name: 💾 PINN Metadaten nach GitHub committen
         shell: bash
@@ -913,16 +706,10 @@ jobs:
             exit 0
           fi
 
-          git commit \
-            -m "🐉 Update DragonOS Pi64 PINN metadata ${OS_VERSION}"
-
+          git commit -m "🐉 Update DragonOS Pi64 PINN metadata ${OS_VERSION}"
           git push
 
           echo "✅ PINN-Metadaten wurden committed."
-
-      # ----------------------------------------------------------
-      # 11. Build-Zusammenfassung
-      # ----------------------------------------------------------
 
       - name: 📊 Build-Zusammenfassung
         if: always()
