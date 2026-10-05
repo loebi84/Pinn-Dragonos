@@ -680,41 +680,15 @@ jobs:
             awk '{print $1}'
           )"
 
-          BOOT_UNCOMPRESSED_MIB=$(
-            (
-              BOOT_RAW_BYTES + 1048575
-            ) / 1048576
-          )
+          BOOT_UNCOMPRESSED_MIB=$(((BOOT_RAW_BYTES + 1048575) / 1048576))
+          ROOT_UNCOMPRESSED_MIB=$(((ROOT_RAW_BYTES + 1048575) / 1048576))
 
-          ROOT_UNCOMPRESSED_MIB=$(
-            (
-              ROOT_RAW_BYTES + 1048575
-            ) / 1048576
-          )
+          DOWNLOAD_SIZE=$((BOOT_UNCOMPRESSED_MIB + ROOT_UNCOMPRESSED_MIB))
 
-          DOWNLOAD_SIZE=$(
-            (
-              BOOT_UNCOMPRESSED_MIB + ROOT_UNCOMPRESSED_MIB
-            )
-          )
+          BOOT_NOMINAL=$((BOOT_UNCOMPRESSED_MIB + 100))
+          ROOT_NOMINAL=$((ROOT_UNCOMPRESSED_MIB + 400))
 
-          BOOT_NOMINAL=$(
-            (
-              BOOT_UNCOMPRESSED_MIB + 100
-            )
-          )
-
-          ROOT_NOMINAL=$(
-            (
-              ROOT_UNCOMPRESSED_MIB + 400
-            )
-          )
-
-          NOMINAL_SIZE=$(
-            (
-              BOOT_NOMINAL + ROOT_NOMINAL
-            )
-          )
+          NOMINAL_SIZE=$((BOOT_NOMINAL + ROOT_NOMINAL))
 
           # --------------------------------------------------------
           # Write partition metadata
