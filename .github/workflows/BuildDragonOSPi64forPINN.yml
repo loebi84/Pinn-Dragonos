@@ -48,13 +48,14 @@ jobs:
           sudo apt-get update
 
           sudo apt-get install -y \
-          curl \
-          parted \
-          xz-utils \
-          gzip \
-          jq \
-          util-linux \
-          pv
+           curl \
+           parted \
+           xz-utils \
+           gzip \
+           jq \
+           util-linux \
+           pv \
+           libarchive-tools
 
       # ------------------------------------------------------------
       # GitHub CLI
@@ -636,14 +637,13 @@ jobs:
           # Create PINN tarballs
           # --------------------------------------------------------
 
-          echo
+                    echo
           echo "Erzeuge boot.tar.xz..."
 
-          sudo tar \
+          sudo bsdtar \
             --numeric-owner \
-            --xattrs \
-            --acls \
-            --sparse \
+            --format gnutar \
+            --one-file-system \
             -C work/boot \
             -cf - \
             . | \
@@ -656,17 +656,17 @@ jobs:
               --interval 1 | \
             xz \
               -T0 \
-              -3 \
+              -9 \
+              -e \
               > boot.tar.xz
 
-                    echo
+          echo
           echo "Erzeuge root.tar.xz..."
 
-          sudo tar \
+          sudo bsdtar \
             --numeric-owner \
-            --xattrs \
-            --acls \
-            --sparse \
+            --format gnutar \
+            --one-file-system \
             -C work/root \
             -cf - \
             . | \
@@ -679,8 +679,11 @@ jobs:
               --interval 1 | \
             xz \
               -T0 \
-              -3 \
+              -9 \
+              -e \
               > root.tar.xz
+
+          
 
           echo
           echo "Tarballs erzeugt:"
@@ -693,49 +696,25 @@ jobs:
           # PINN partition metadata
           # --------------------------------------------------------
 
-          BOOT_RAW_BYTES="$(
-            sudo du -sb work/boot |
-            awk '{print $1}'
-          )"
-
-          ROOT_RAW_BYTES="$(
-            sudo du -sb work/root |
-            awk '{print $1}'
-          )"
-
-          BOOT_UNCOMPRESSED_MIB=$(((BOOT_RAW_BYTES + 1048575) / 1048576))
-          ROOT_UNCOMPRESSED_MIB=$(((ROOT_RAW_BYTES + 1048575) / 1048576))
-
-          DOWNLOAD_SIZE=$((BOOT_UNCOMPRESSED_MIB + ROOT_UNCOMPRESSED_MIB))
-
-          BOOT_NOMINAL=$((BOOT_UNCOMPRESSED_MIB + 100))
-          ROOT_NOMINAL=$((ROOT_UNCOMPRESSED_MIB + 400))
-
-          NOMINAL_SIZE=$((BOOT_NOMINAL + ROOT_NOMINAL))
-
-          # --------------------------------------------------------
-          # Write partition metadata
-          # --------------------------------------------------------
-
           cat > pinn/partitions.json <<EOF
           {
             "partition_setup": "mbr",
             "partitions": [
               {
                 "partition": 1,
-                "filesystem": "fat32",
                 "label": "boot",
-                "tarball": "boot.tar.xz",
-                "uncompressed": ${BOOT_UNCOMPRESSED_MIB},
-                "nominal_size": ${BOOT_NOMINAL}
+                "filesystem_type": "fat",
+                "partition_size_nominal": ${BOOT_NOMINAL},
+                "want_maximised": false,
+                "uncompressed_tarball_size": ${BOOT_UNCOMPRESSED_MIB}
               },
               {
                 "partition": 2,
-                "filesystem": "ext4",
                 "label": "root",
-                "tarball": "root.tar.xz",
-                "uncompressed": ${ROOT_UNCOMPRESSED_MIB},
-                "nominal_size": ${ROOT_NOMINAL}
+                "filesystem_type": "ext4",
+                "partition_size_nominal": ${ROOT_NOMINAL},
+                "want_maximised": true,
+                "uncompressed_tarball_size": ${ROOT_UNCOMPRESSED_MIB}
               }
             ]
           }
@@ -745,7 +724,7 @@ jobs:
           # Basic OS metadata
           # --------------------------------------------------------
 
-          cat > pinn/os.json <<EOF
+           cat > pinn/os.json <<EOF
           {
             "name": "DragonOS Pi64",
             "description": "DragonOS Pi64 ${DRAGONOS_VERSION}",
@@ -754,11 +733,11 @@ jobs:
             "supported_models": [
               "Pi 3",
               "Pi 4",
-              "Pi 400"
+              "Pi 400",
+              "Pi 5"
             ],
             "download_size": ${DOWNLOAD_SIZE},
-            "nominal_size": ${NOMINAL_SIZE},
-            "partitions": "partitions.json"
+            "nominal_size": ${NOMINAL_SIZE}
           }
           EOF
 
