@@ -47,13 +47,14 @@ jobs:
 
           sudo apt-get update
 
-          sudo apt-get install -y \
-            curl \
-            parted \
-            xz-utils \
-            gzip \
-            jq \
-            util-linux
+        sudo apt-get install -y \
+        curl \
+        parted \
+        xz-utils \
+        gzip \
+        jq \
+        util-linux \
+        pv
 
       # ------------------------------------------------------------
       # GitHub CLI
@@ -639,25 +640,43 @@ jobs:
           echo "Erzeuge boot.tar.xz..."
 
           sudo tar \
-            --numeric-owner \
-            --xattrs \
-            --acls \
-            --sparse \
-            -C work/boot \
-            -cJf boot.tar.xz \
-            .
+         --numeric-owner \
+         --xattrs \
+         --acls \
+         --sparse \
+         -C work/boot \
+         -cf - \
+         . | \
+         pv \
+         --rate \
+         --timer \
+         --eta \
+         --bytes | \
+         xz \
+         -T0 \
+         -3 \
+         > boot.tar.xz
 
           echo
           echo "Erzeuge root.tar.xz..."
 
-          sudo tar \
-            --numeric-owner \
-            --xattrs \
-            --acls \
-            --sparse \
-            -C work/root \
-            -cJf root.tar.xz \
-            .
+         sudo tar \
+         --numeric-owner \
+         --xattrs \
+         --acls \
+         --sparse \
+         -C work/root \
+         -cf - \
+         . | \
+         pv \
+         --rate \
+         --timer \
+         --eta \
+         --bytes | \
+         xz \
+         -T0 \
+         -3 \
+         > root.tar.xz
 
           echo
           echo "Tarballs erzeugt:"
