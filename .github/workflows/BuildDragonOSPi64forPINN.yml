@@ -47,14 +47,14 @@ jobs:
 
           sudo apt-get update
 
-        sudo apt-get install -y \
-        curl \
-        parted \
-        xz-utils \
-        gzip \
-        jq \
-        util-linux \
-        pv
+          sudo apt-get install -y \
+          curl \
+          parted \
+          xz-utils \
+          gzip \
+          jq \
+          util-linux \
+          pv
 
       # ------------------------------------------------------------
       # GitHub CLI
