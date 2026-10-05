@@ -640,43 +640,47 @@ jobs:
           echo "Erzeuge boot.tar.xz..."
 
           sudo tar \
-          --numeric-owner \
-          --xattrs \
-          --acls \
-          --sparse \
-          -C work/boot \
-          -cf - \
-          . | \
-          pv \
-          --rate \
-          --timer \
-          --eta \
-          --bytes | \
-          xz \
-          -T0 \
-          -3 \
-          > boot.tar.xz
+            --numeric-owner \
+            --xattrs \
+            --acls \
+            --sparse \
+            -C work/boot \
+            -cf - \
+            . | \
+            pv \
+              --force \
+              --progress \
+              --timer \
+              --rate \
+              --bytes \
+              --interval 1 | \
+            xz \
+              -T0 \
+              -3 \
+              > boot.tar.xz
 
-          echo
+                    echo
           echo "Erzeuge root.tar.xz..."
 
           sudo tar \
-          --numeric-owner \
-          --xattrs \
-          --acls \
-          --sparse \
-          -C work/root \
-          -cf - \
-          . | \
-          pv \
-          --rate \
-          --timer \
-          --eta \
-          --bytes | \
-          xz \
-          -T0 \
-          -3 \
-          > root.tar.xz
+            --numeric-owner \
+            --xattrs \
+            --acls \
+            --sparse \
+            -C work/root \
+            -cf - \
+            . | \
+            pv \
+              --force \
+              --progress \
+              --timer \
+              --rate \
+              --bytes \
+              --interval 1 | \
+            xz \
+              -T0 \
+              -3 \
+              > root.tar.xz
 
           echo
           echo "Tarballs erzeugt:"
